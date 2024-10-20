@@ -27,20 +27,61 @@ Remember:
 Always ensure that your helper methods are bulk-safe to handle multiple records efficiently. 
 */
 public with sharing class AccountHelper {
-    
-    public void setTypeProspect(SObject objects){
+  public static void setTypeProspect(Account acc) {
+    if (String.isBlank(acc.Type)) {
+      acc.Type = 'Prospect';
+    }
+  }
 
+  public void addressCopy(Account acc) {
+    if (
+      String.isBlank(acc.ShippingStreet) && !String.isBlank(acc.BillingStreet)
+    ) {
+      acc.BillingStreet = acc.ShippingStreet;
+      acc.BillingCity = acc.ShippingCity;
+      acc.BillingState = acc.ShippingState;
+      acc.BillingPostalCode = acc.ShippingPostalCode;
+      acc.BillingCountry = acc.ShippingCountry;
+    }
+  }
+
+  public void setRating(List<Account> accountList) {
+    for (Account acc : accountList) {
+      if (String.isBlank(acc.Rating)) {
+        acc.Rating = 'Warm';
+      }
+    }
+  }
+
+  // defaultContact creates a default contact list based on when an account is inserted
+  public void defaultContact(List<Account> accountList) {
+    Set<Id> accountIds = new Set<Id>();
+
+    for (Account acc : accountList) {
+      if (acc.Name == null) {
+        accountIds.add(acc.Id);
+      }
     }
 
-    void addressCopy(){
+    // needed to query for the default primary contact
+    List<Contact> primaryContactList = [
+      SELECT Id, AccountId
+      FROM Contact
+      WHERE AccountId IN :accountIds
+      ORDER BY LastName
+      LIMIT 1
+    ];
 
+    // map for the account Ids
+    Map<Id, Contact> contactMap = new Map<Id, Contact>();
+    for (Contact con : primaryContactList) {
+      contactMap.put(con.AccountId, con);
     }
 
-    //[public | private ] [static] data_type setRating (input parameters) {
-    //  The body of the method
-    //}
-
-    //[public | private ] [static] data_type defaultContact (input parameters) {
-    //  The body of the method
-    //}
+    for (Account acc : accountList) {
+      if (acc.Name == null && contactMap.containsKey(acc.Id)) {
+        acc.Id = contactMap.get(acc.Id).Id;
+      }
+    }
+  }
 }
